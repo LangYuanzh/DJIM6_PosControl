@@ -44,7 +44,7 @@ bool usegps = true, useuwb = false;
 
 bool obtainControlPermission = false;
 bool obtain_control_result = false;
-
+bool arrived = false;
 std::string logname = "/home/xuanlingmu/log/";
 
 Mission square_mission;
@@ -177,15 +177,7 @@ void Mission::step()
   float rollCmd, pitchCmd, zCmd;
 
   localOffsetFromGpsOffset(localOffset, current_gps, start_gps_location);
-/*
-  double xOffsetRemaining = target_offset_x - localOffset.x;
-  double yOffsetRemaining = target_offset_y - localOffset.y;
-  double zOffsetRemaining = target_offset_z - localOffset.z;
 
-  double yawDesiredRad     = deg2rad * target_yaw;
-  double yawThresholdInRad = deg2rad * yawThresholdInDeg;
-  double yawInRad          = toEulerAngle(current_atti).z;
-*/
   target_offset.x = target_position.x - current_local_pos.x;
   target_offset.y = target_position.y - current_local_pos.y;
   target_offset.z = target_position.z - current_local_pos.z;
@@ -221,57 +213,28 @@ void Mission::step()
     info_counter = 0;
     
   }
-
-  if(target_offset.x>-0.15&&target_offset.x<0.15&&target_offset.y>-0.15&&target_offset.x<0.15)
+  static ros::Time starttime = ros::Time::now();
+  if(target_offset.x>-0.3&&target_offset.x<0.3&&target_offset.y>-0.3&&target_offset.x<0.3)
   {
-     static ros::Time starttime = ros::Time::now();
-     ros::Duration elapsed_time = ros::Time::now() - starttime;
-     if(elapsed_time > ros::Duration(60))
-       {
-          starttime = ros::Time::now();
-          square_mission.finished = true;
-          
-       }
-  }
-  /*!
-   * @brief: if we already started breaking, keep break for 50 sample (1sec)
-   *         and call it done, else we send normal command
-   */
-
-  if (break_counter > 50)
+     arrived = true;  
+  } 
+  if(arrived)
   {
-    ROS_INFO("##### Route %d finished....", state);
-    finished = true;
-    return;
+    ros::Duration elapsed_time = ros::Time::now() - starttime;
+    if(elapsed_time > ros::Duration(60))
+      square_mission.finished = true;
   }
-  else if(break_counter > 0)
+  else
   {
-    sensor_msgs::Joy controlVelYawRate;
-    uint8_t flag = (DJISDK::VERTICAL_VELOCITY   |
-                DJISDK::HORIZONTAL_ANGLE |
-                DJISDK::YAW_RATE            |
-                DJISDK::HORIZONTAL_GROUND   |
-                DJISDK::STABLE_ENABLE);
-    controlVelYawRate.axes.push_back(0);
-    controlVelYawRate.axes.push_back(0);
-    controlVelYawRate.axes.push_back(0);
-    controlVelYawRate.axes.push_back(0);
-    controlVelYawRate.axes.push_back(flag);
-
-    ctrlBrakePub.publish(controlVelYawRate);
-    break_counter++;
-    return;
+     starttime = ros::Time::now();
   }
-  else //break_counter = 0, not in break stage
-  {
-    sensor_msgs::Joy controlRollPitchYaw;
-    //ROS_ERROR("SEND SEND SEND");
-    controlRollPitchYaw.axes.push_back(rollCmd);
-    controlRollPitchYaw.axes.push_back(pitchCmd);
-    controlRollPitchYaw.axes.push_back(target_Z);
-    controlRollPitchYaw.axes.push_back(0);
-    ctrlRollPitchYawPub.publish(controlRollPitchYaw);
-  }
+  
+  sensor_msgs::Joy controlRollPitchYaw;
+  controlRollPitchYaw.axes.push_back(rollCmd);
+  controlRollPitchYaw.axes.push_back(pitchCmd);
+  controlRollPitchYaw.axes.push_back(target_Z);
+  controlRollPitchYaw.axes.push_back(0);
+  ctrlRollPitchYawPub.publish(controlRollPitchYaw);
 
 }
 void Mission::calculateDesVel(geometry_msgs::Vector3 _target_offset)
@@ -336,7 +299,6 @@ void Mission::calculateTargetAttFromAccel(geometry_msgs::Vector3 _target_accel)
     target_attitude.y = atan(acce_forward / 9.8);
     target_attitude.x = -atan(acce_left * cos(target_attitude.y) / 9.8);
     
-    //ROS_INFO("yaw: %f ACC: %f, %f accbody: %f, %f att: %f, %f ", att_yaw, _target_accel.x,_target_accel.y,acce_forward,acce_left,target_attitude.x,target_attitude.y);
     if(target_attitude.y > (max_pitch_roll*C_PI/180.0))
         target_attitude.y =  max_pitch_roll*C_PI/180.0;
     else if (target_attitude.y < -(max_pitch_roll*C_PI/180.0))
@@ -497,37 +459,24 @@ void gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg)
 		    break;
 
 		  case 1:
-		    if(!square_mission.finished)
+		    if(square_mission.finished)
 		    {
-		      square_mission.step();
-		    }
-		    else
-		    {
-		      //square_mission.reset();
-		      //square_mission.start_gps_location = current_gps;
-		     // square_mission.start_local_position = current_local_pos;
 		      square_mission.setTarget(8, 0, 3, 0);
               square_mission.finished = false;
-              square_mission.step();
-		      //square_mission.state = 2;
-		      ROS_INFO("##### Start route %d ....", square_mission.state);
+              arrived = false;
+              //square_mission.state = 2;
 		    }
+            square_mission.step();
 		    break;
 
 		  case 2:
-		    if(!square_mission.finished)
+		    if(square_mission.finished)
 		    {
-		      square_mission.step();
+		      square_mission.setTarget(5, 5, 3, 0);
+              square_mission.finished = false;
+              arrived = false;  
 		    }
-		    else
-		    {
-		      square_mission.reset();
-		      square_mission.start_gps_location = current_gps;
-		      square_mission.start_local_position = current_local_pos;
-		      square_mission.setTarget(0, -20, 0, 0);
-		      square_mission.state = 3;
-		      ROS_INFO("##### Start route %d ....", square_mission.state);
-		    }
+            square_mission.step();
 		    break;
 		  
 		}
