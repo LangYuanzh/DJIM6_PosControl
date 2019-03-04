@@ -1,0 +1,6 @@
+<launch>
+    <node pkg="uwb" type="uwb_2" name="uwb_2" output="screen"> </node>
+    <node pkg="uwb" type="uwb_3" name="uwb_3" output="screen"> </node>
+    <node pkg="uwb" type="uwb_node" name="uwb_node" output="screen"> </node>
+    
+</launch>
