@@ -137,10 +137,23 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
+add_executable(laser_rc_control
+        src/laser_rc_control.cpp)
+target_link_libraries(laser_rc_control
+        ${catkin_LIBRARIES}
+        ${DJIOSDK_LIBRARIES}
+        )
+add_dependencies(laser_rc_control dji_sdk_generate_messages_cpp)
 
 add_executable(position_control
         src/position_control.cpp)
 target_link_libraries(position_control
+        ${catkin_LIBRARIES}
+        ${DJIOSDK_LIBRARIES}
+        )
+add_executable(data_collect
+        src/data_collect.cpp)
+target_link_libraries(data_collect
         ${catkin_LIBRARIES}
         ${DJIOSDK_LIBRARIES}
         )
