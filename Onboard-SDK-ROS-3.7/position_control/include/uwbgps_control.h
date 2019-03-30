@@ -48,6 +48,8 @@ double vxy_P;
 double vxy_I;
 double vxy_D;
 
+double max_V;
+double max_ACC;
 double target_X,target_Y,target_Z;
 double max_pitch_roll;
 

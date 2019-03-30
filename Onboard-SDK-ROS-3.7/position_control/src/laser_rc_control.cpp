@@ -85,23 +85,25 @@ int main(int argc, char** argv)
   query_version_service      = nh.serviceClient<dji_sdk::QueryDroneVersion>("dji_sdk/query_drone_version");//
   set_local_pos_reference    = nh.serviceClient<dji_sdk::SetLocalPosRef> ("dji_sdk/set_local_pos_ref");//Set the origin of the local position to be the current GPS coordinate. Fail if GPS health is low (<=3).
 
-  nh.param("/position_control/alt_P", alt_P, 1.3);
-  nh.param("/position_control/vz_P",  vz_P,  0.5);
-  nh.param("/position_control/vz_I",  vz_I,  0.05);
-  nh.param("/position_control/vz_D",  vz_D,  0.2);
-  nh.param("/position_control/xy_P",  xy_P,  1.0);
-  nh.param("/position_control/vxy_P", vxy_P, 0.85);
-  nh.param("/position_control/vxy_I", vxy_I, 0.45);
-  nh.param("/position_control/vxy_D", vxy_D, 0.11);
-  nh.param("/position_control/tag_X", target_X, 0.11);
-  nh.param("/position_control/tag_Y", target_Y, 0.11);
-  nh.param("/position_control/tag_Z", target_Z, 0.11);
-  nh.param("/position_control/max_pitch_roll", max_pitch_roll, 10.0);
+  nh.param("/laser_rc_control/alt_P", alt_P, 1.3);
+  nh.param("/laser_rc_control/vz_P",  vz_P,  0.5);
+  nh.param("/laser_rc_control/vz_I",  vz_I,  0.05);
+  nh.param("/laser_rc_control/vz_D",  vz_D,  0.2);
+  nh.param("/laser_rc_control/xy_P",  xy_P,  1.0);
+  nh.param("/laser_rc_control/vxy_P", vxy_P, 0.85);
+  nh.param("/laser_rc_control/vxy_I", vxy_I, 0.45);
+  nh.param("/laser_rc_control/vxy_D", vxy_D, 0.11);
+  nh.param("/laser_rc_control/tag_X", target_X, 0.11);
+  nh.param("/laser_rc_control/tag_Y", target_Y, 0.11);
+  nh.param("/laser_rc_control/tag_Z", target_Z, 0.11);
+  nh.param("/laser_rc_control/max_V", max_V, 3.0);
+  nh.param("/laser_rc_control/max_ACC", max_ACC, 1.5);
+  nh.param("/laser_rc_control/max_pitch_roll", max_pitch_roll, 10.0);
   
   time_t currtime = time(NULL);
 	tm* p = localtime(&currtime);
   sprintf(logname,"/home/xuanlingmu/flightlog/%d%02d%02d%02d%02d%02d.txt",p->tm_year+1900,p->tm_mon+1,p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec);
-
+  //ROS_ERROR("????????????????????????????   %f %f %f",target_X,target_Y,target_Z);
   //std::fstream lognamefile;
   //square_mission.log.open(logname,std::ios::app|std::ios::out);
   if (!set_local_position()) // We need this for height
@@ -170,7 +172,7 @@ void Mission::step()
   target_offset.y = target_position.y - current_local_pos.y;
   target_offset.z = target_position.z - current_local_pos.z;
   calculateDesVel(target_offset);
-                                           
+                              
   velocity_offset.x = target_velocity.x - current_velocity.x;
   velocity_offset.y = target_velocity.y - current_velocity.y;
   velocity_offset.z = target_velocity.z - current_velocity.z;
@@ -338,6 +340,10 @@ void Mission::calculateDesVel(geometry_msgs::Vector3 _target_offset)
    
    target_velocity.x = _target_offset.x * xy_P;
    target_velocity.y = _target_offset.y * xy_P;
+   if(target_velocity.x > max_V)target_velocity.x = max_V;
+   if(target_velocity.x < -max_V)target_velocity.x = -max_V;
+   if(target_velocity.y > max_V)target_velocity.y = max_V;
+   if(target_velocity.y < -max_V)target_velocity.y = -max_V;
 
    if(_target_offset.z > 3)
        _target_offset.z = 3;
@@ -361,12 +367,14 @@ void Mission::calculateDesAccel(geometry_msgs::Vector3 _velocity_offset)
    ix = vxy_I * intergrated.x;
    dx = vxy_D * derivative.x; 
    target_accel.x = px + ix +dx;
-   
+   if(target_accel.x > max_ACC)target_accel.x = max_ACC;
+   if(target_accel.x < -max_ACC)target_accel.x = -max_ACC;
    py = vxy_P * _velocity_offset.y;
    iy = vxy_I * intergrated.y;
    dy = vxy_D * derivative.y; 
    target_accel.y = py + iy +dy;
-
+   if(target_accel.y > max_ACC)target_accel.y = max_ACC;
+   if(target_accel.y < -max_ACC)target_accel.y = -max_ACC;
    pz = vz_P * _velocity_offset.z;
    iz = vz_I * intergrated.z;
    dz = vz_D * derivative.z;
